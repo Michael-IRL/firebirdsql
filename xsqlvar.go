@@ -220,8 +220,6 @@ func (x *xSQLVAR) scantype() reflect.Type {
 }
 
 func (x *xSQLVAR) _parseTimezone(raw_value []byte) *time.Location {
-	fmt.Println("_parseTimezone")
-	fmt.Println(raw_value)
 	timezone := getTimezoneNameByID(int(bytes_to_bint16(raw_value)))
 	tz, _ := time.LoadLocation(timezone)
 	return tz
@@ -466,6 +464,20 @@ func (x *xSQLVAR) value(raw_value []byte, timezone string, charset string) (v in
 			v = i64
 		}
 	case SQL_TYPE_INT128:
+		var isNegative bool
+
+		// when raw_value[0] is > 127, then subtract 255 in every index
+		if raw_value[0] > 127 {
+			for i := range raw_value {
+				if raw_value[i] < 255 {
+					raw_value[i] = 255 - raw_value[i]
+				} else {
+					raw_value[i] -= 255
+				}
+			}
+			isNegative = true
+		}
+
 		// reverse
 		for i, j := 0, len(raw_value)-1; i < j; i, j = i+1, j-1 {
 			raw_value[i], raw_value[j] = raw_value[j], raw_value[i]
@@ -491,6 +503,12 @@ func (x *xSQLVAR) value(raw_value []byte, timezone string, charset string) (v in
 
 			// add to x
 			x.Add(x, xx)
+		}
+
+		// when negative, add 1 and mul -1
+		if isNegative {
+			x.Add(x, big.NewInt(1))
+			x.Mul(x, big.NewInt(-1))
 		}
 		v = x
 	case SQL_TYPE_DATE:
@@ -527,4 +545,111 @@ func (x *xSQLVAR) value(raw_value []byte, timezone string, charset string) (v in
 		v = decimal128ToDecimal(raw_value)
 	}
 	return
+}
+
+func calcBlr(xsqlda []xSQLVAR) []byte {
+	// Calculate  BLR from XSQLVAR array.
+	ln := len(xsqlda) * 2
+	blr := make([]byte, (ln*4)+8)
+	blr[0] = 5
+	blr[1] = 2
+	blr[2] = 4
+	blr[3] = 0
+	blr[4] = byte(ln & 255)
+	blr[5] = byte(ln >> 8)
+	n := 6
+
+	for _, x := range xsqlda {
+		sqlscale := x.sqlscale
+		if sqlscale < 0 {
+			sqlscale += 256
+		}
+		switch x.sqltype {
+		case SQL_TYPE_VARYING:
+			blr[n] = 37
+			blr[n+1] = byte(x.sqllen & 255)
+			blr[n+2] = byte(x.sqllen >> 8)
+			n += 3
+		case SQL_TYPE_TEXT:
+			blr[n] = 14
+			blr[n+1] = byte(x.sqllen & 255)
+			blr[n+2] = byte(x.sqllen >> 8)
+			n += 3
+		case SQL_TYPE_LONG:
+			blr[n] = 8
+			blr[n+1] = byte(sqlscale)
+			n += 2
+		case SQL_TYPE_SHORT:
+			blr[n] = 7
+			blr[n+1] = byte(sqlscale)
+			n += 2
+		case SQL_TYPE_INT64:
+			blr[n] = 16
+			blr[n+1] = byte(sqlscale)
+			n += 2
+		case SQL_TYPE_INT128:
+			blr[n] = 26
+			blr[n+1] = byte(sqlscale)
+			n += 2
+		case SQL_TYPE_QUAD:
+			blr[n] = 9
+			blr[n+1] = byte(sqlscale)
+			n += 2
+		case SQL_TYPE_DEC_FIXED: // OBSOLATED
+			blr[n] = 26
+			blr[n+1] = byte(sqlscale)
+			n += 2
+		case SQL_TYPE_DOUBLE:
+			blr[n] = 27
+			n++
+		case SQL_TYPE_FLOAT:
+			blr[n] = 10
+			n++
+		case SQL_TYPE_D_FLOAT:
+			blr[n] = 11
+			n++
+		case SQL_TYPE_DATE:
+			blr[n] = 12
+			n++
+		case SQL_TYPE_TIME:
+			blr[n] = 13
+			n++
+		case SQL_TYPE_TIMESTAMP:
+			blr[n] = 35
+			n++
+		case SQL_TYPE_BLOB:
+			blr[n] = 9
+			blr[n+1] = 0
+			n += 2
+		case SQL_TYPE_ARRAY:
+			blr[n] = 9
+			blr[n+1] = 0
+			n += 2
+		case SQL_TYPE_BOOLEAN:
+			blr[n] = 23
+			n++
+		case SQL_TYPE_DEC64:
+			blr[n] = 24
+			n++
+		case SQL_TYPE_DEC128:
+			blr[n] = 25
+			n++
+		case SQL_TYPE_TIME_TZ:
+			blr[n] = 28
+			n++
+		case SQL_TYPE_TIMESTAMP_TZ:
+			blr[n] = 29
+			n++
+		}
+		// [blr_short, 0]
+		blr[n] = 7
+		blr[n+1] = 0
+		n += 2
+	}
+	// [blr_end, blr_eoc]
+	blr[n] = 255
+	blr[n+1] = 76
+	n += 2
+
+	return blr[:n]
 }

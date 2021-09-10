@@ -28,7 +28,6 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
-	"github.com/shopspring/decimal"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -149,7 +148,7 @@ func TestBasic(t *testing.T) {
 
 	for rows.Next() {
 		rows.Scan(&a, &b, &c, &d, &e, &f, &g, &h, &i, &j)
-		//		fmt.Println(a, b, c, d, e, f, g, h, i, j)
+		// fmt.Println(a, b, c, d, e, f, g, h, i, j)
 	}
 
 	stmt, _ := conn.Prepare("select count(*) from foo where a=? and b=? and d=? and e=? and f=? and g=?")
@@ -402,20 +401,21 @@ func TestDecFloat(t *testing.T) {
 		return
 	}
 
-	sql := `
+	query := `
         CREATE TABLE test_decfloat (
             i integer,
             d DECIMAL(20, 2),
-            df64 DECFLOAT(16),
-            df128 DECFLOAT(34)
+            df16 DECFLOAT(16),
+            df34 DECFLOAT(34),
+            s varchar(32)
         )
     `
-	conn.Exec(sql)
-	conn.Exec("insert into test_decfloat(i, d, df64, df128) values (1, 0.0, 0.0, 0.0)")
-	conn.Exec("insert into test_decfloat(i, d, df64, df128) values (2, 1.0, 1.0, 1.0)")
-	conn.Exec("insert into test_decfloat(i, d, df64, df128) values (3, 20.0, 20.0, 20.0)")
-	conn.Exec("insert into test_decfloat(i, d, df64, df128) values (4, -1.0, -1.0, -1.0)")
-	conn.Exec("insert into test_decfloat(i, d, df64, df128) values (5, -20.0, -20.0, -20.0)")
+	conn.Exec(query)
+	conn.Exec("insert into test_decfloat(i, d, df16, df34, s) values (1, 0.0, 0.0, 0.0, '0.0')")
+	conn.Exec("insert into test_decfloat(i, d, df16, df34, s) values (2, 1.1, 1.1, 1.1, '1.1')")
+	conn.Exec("insert into test_decfloat(i, d, df16, df34, s) values (3, 120.2, 120.2, 120.2, '120.2')")
+	conn.Exec("insert into test_decfloat(i, d, df16, df34, s) values (4, -1.1, -1.1, -1.1, '-1.1')")
+	conn.Exec("insert into test_decfloat(i, d, df16, df34, s) values (5, -120.2, -120.2, -120.2, '-120.2')")
 
 	var n int
 	err = conn.QueryRow("select count(*) cnt from test_decfloat").Scan(&n)
@@ -426,11 +426,19 @@ func TestDecFloat(t *testing.T) {
 		t.Fatalf("Error bad record count: %v", n)
 	}
 
-	rows, err := conn.Query("select d, df64, df128 from test_decfloat order by i")
+	rows, err := conn.Query("select df16, df34, s from test_decfloat order by i")
 
-	var d, df64, df128 decimal.Decimal
+	var df16, df34 sql.NullFloat64
+	var s string
 	for rows.Next() {
-		rows.Scan(&d, &df64, &df128)
+		rows.Scan(&df16, &df34, &s)
+		f, _ := strconv.ParseFloat(s, 64)
+		df16v, _ := df16.Value()
+		df34v, _ := df34.Value()
+
+		if df16v != f || df34v != f {
+			fmt.Printf("Error decfloat value : %v,%v,%v\n", df16v, df34v, f)
+		}
 	}
 
 	conn.Close()
@@ -498,6 +506,41 @@ func TestInt128(t *testing.T) {
 
 	if i128.Cmp(toCmp) != 0 {
 		t.Fatalf("INT128 Error: %v", i128)
+	}
+
+	conn.Close()
+}
+
+func TestNegativeInt128(t *testing.T) {
+	conn, err := sql.Open("firebirdsql_createdb", GetTestDSN("test_negative_int128_"))
+	if err != nil {
+		t.Fatalf("Error connecting: %v", err)
+	}
+
+	firebird_major_version := get_firebird_major_version(conn)
+	if firebird_major_version < 4 {
+		return
+	}
+
+	sql := `
+        CREATE TABLE test_negative_int128 (
+            i int128
+        )
+    `
+	conn.Exec(sql)
+	conn.Exec("insert into test_negative_int128(i) values (-170141183460469231731687303715884105727)")
+
+	var i128 *big.Int
+	err = conn.QueryRow("SELECT i FROM test_negative_int128").Scan(&i128)
+	if err != nil {
+		t.Fatalf("Error SELECT: %v", err)
+	}
+
+	var toCmp = new(big.Int)
+	toCmp, _ = toCmp.SetString("-170141183460469231731687303715884105727", 10)
+
+	if i128.Cmp(toCmp) != 0 {
+		t.Fatalf("Negative INT128 Error: %v", i128)
 	}
 
 	conn.Close()
