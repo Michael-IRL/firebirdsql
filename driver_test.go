@@ -456,7 +456,7 @@ func TestTimeZone(t *testing.T) {
 	}
 
 	sql := `
-            CREATE TABLE tz_test (
+            CREATE TABLE test_timezone (
                 id INTEGER NOT NULL,
                 a TIME WITH TIME ZONE DEFAULT '12:34:56',
                 b TIMESTAMP WITH TIME ZONE DEFAULT '1967-08-11 23:45:01',
@@ -464,7 +464,7 @@ func TestTimeZone(t *testing.T) {
             )
     `
 	conn.Exec(sql)
-	conn.Exec("insert into tz_test (id) values (1)")
+	conn.Exec("insert into test_timezone (id) values (1)")
 
 	// conn.Exec("insert into test_timezone(t) values ('01:23')")
 	// conn.Exec("insert into test_timezone(t) values ('12:34+09:00')")
