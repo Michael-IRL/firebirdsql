@@ -445,7 +445,6 @@ func TestDecFloat(t *testing.T) {
 }
 
 func TestTimeZone(t *testing.T) {
-	// https://github.com/nakagami/firebirdsql/issues/128
 	conn, err := sql.Open("firebirdsql_createdb", GetTestDSN("test_timezone_")+"?timezone=Asia/Tokyo")
 	if err != nil {
 		t.Fatalf("Error connecting: %v", err)
@@ -457,18 +456,24 @@ func TestTimeZone(t *testing.T) {
 	}
 
 	sql := `
-        CREATE TABLE test_timezone (
-			t TIME WITH TIME ZONE
-        )
+            CREATE TABLE tz_test (
+                id INTEGER NOT NULL,
+                a TIME WITH TIME ZONE DEFAULT '12:34:56',
+                b TIMESTAMP WITH TIME ZONE DEFAULT '1967-08-11 23:45:01',
+                PRIMARY KEY (id)
+            )
     `
 	conn.Exec(sql)
-	conn.Exec("insert into test_timezone(t) values (?)", time.Now())
+	conn.Exec("insert into tz_test (id) values (1)")
+
 	// conn.Exec("insert into test_timezone(t) values ('01:23')")
 	// conn.Exec("insert into test_timezone(t) values ('12:34+09:00')")
 
-	var tz time.Time
-	err = conn.QueryRow("SELECT t FROM test_timezone").Scan(&tz)
-	fmt.Println(tz)
+	var id int
+	var a time.Time
+	var b time.Time
+	err = conn.QueryRow("SELECT * FROM test_timezone").Scan(&id, &a, &b)
+	fmt.Println(id, a, b)
 
 	conn.Close()
 }
