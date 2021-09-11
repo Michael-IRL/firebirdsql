@@ -281,7 +281,7 @@ func (x *xSQLVAR) parseTimestamp(raw_value []byte, timezone string) time.Time {
 	}
 
 	year, month, day := x._parseDate(raw_value[:4])
-	h, m, s, n := x._parseTime(raw_value[4:6])
+	h, m, s, n := x._parseTime(raw_value[4:8])
 	return time.Date(year, time.Month(month), day, h, m, s, n, tz)
 }
 
