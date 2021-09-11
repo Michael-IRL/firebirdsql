@@ -446,7 +446,7 @@ func TestDecFloat(t *testing.T) {
 
 func TestTimeZone(t *testing.T) {
 	// https://github.com/nakagami/firebirdsql/issues/128
-	conn, err := sql.Open("firebirdsql_createdb", GetTestDSN("test_timezone_"))
+	conn, err := sql.Open("firebirdsql_createdb", GetTestDSN("test_timezone_") + "?timezone=Tokyo/Asia")
 	if err != nil {
 		t.Fatalf("Error connecting: %v", err)
 	}
