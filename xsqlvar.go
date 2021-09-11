@@ -271,7 +271,9 @@ func (x *xSQLVAR) parseTime(raw_value []byte, timezone string) time.Time {
 		tz, _ = time.LoadLocation(timezone)
 	}
 	h, m, s, n := x._parseTime(raw_value)
-	return time.Date(0, time.Month(1), 1, h, m, s, n, tz)
+	now := time.Now()
+	dt := time.Date(now.Year(), now.Month(), now.Day(), h, m, s, n, tz)
+	return dt
 }
 
 func (x *xSQLVAR) parseTimestamp(raw_value []byte, timezone string) time.Time {
@@ -289,9 +291,9 @@ func (x *xSQLVAR) parseTimeTz(raw_value []byte) time.Time {
 	h, m, s, n := x._parseTime(raw_value[:4])
 	tz := x._parseTimezone(raw_value[4:6])
 	offset := x._parseTimezone(raw_value[6:8])
-	t := time.Date(0, time.Month(1), 1, h, m, s, n, tz).In(offset)
-	t = time.Date(0, time.Month(1), 1, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), offset)
-	return t
+	now := time.Now()
+	dt := time.Date(now.Year(), now.Month(), now.Day(), h, m, s, n, tz).In(offset)
+	return dt
 }
 
 func (x *xSQLVAR) parseTimestampTz(raw_value []byte) time.Time {
