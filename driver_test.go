@@ -444,7 +444,6 @@ func TestDecFloat(t *testing.T) {
 	conn.Close()
 }
 
-
 func TestTimeZone(t *testing.T) {
 	// https://github.com/nakagami/firebirdsql/issues/128
 	conn, err := sql.Open("firebirdsql_createdb", GetTestDSN("test_timezone_"))
@@ -473,7 +472,6 @@ func TestTimeZone(t *testing.T) {
 
 	conn.Close()
 }
-
 
 func TestInt128(t *testing.T) {
 	// https://github.com/nakagami/firebirdsql/issues/129

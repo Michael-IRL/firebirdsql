@@ -26,18 +26,16 @@ package firebirdsql
 import (
 	"bytes"
 	"encoding/binary"
-	"math"
-	"math/big"
-	"reflect"
-	"time"
-	"fmt"
-
 	"github.com/shopspring/decimal"
 	"golang.org/x/text/encoding/charmap"
 	"golang.org/x/text/encoding/japanese"
 	"golang.org/x/text/encoding/korean"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/encoding/traditionalchinese"
+	"math"
+	"math/big"
+	"reflect"
+	"time"
 )
 
 const (
@@ -283,21 +281,24 @@ func (x *xSQLVAR) parseTimestamp(raw_value []byte, timezone string) time.Time {
 	}
 
 	year, month, day := x._parseDate(raw_value[:4])
-	h, m, s, n := x._parseTime(raw_value[4:])
+	h, m, s, n := x._parseTime(raw_value[4:6])
 	return time.Date(year, time.Month(month), day, h, m, s, n, tz)
 }
 
 func (x *xSQLVAR) parseTimeTz(raw_value []byte) time.Time {
 	h, m, s, n := x._parseTime(raw_value[:4])
-	tz := x._parseTimezone(raw_value[4:])
-	return time.Date(0, time.Month(1), 1, h, m, s, n, tz)
+	tz := x._parseTimezone(raw_value[4:6])
+	offset := x._parseTimezone(raw_value[6:8])
+	t := time.Date(0, time.Month(1), 1, h, m, s, n, tz).In(offset)
+	return time.Date(0, time.Month(1), 1, t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), offset)
 }
 
 func (x *xSQLVAR) parseTimestampTz(raw_value []byte) time.Time {
 	year, month, day := x._parseDate(raw_value[:4])
 	h, m, s, n := x._parseTime(raw_value[4:8])
-	tz := x._parseTimezone(raw_value[8:])
-	return time.Date(year, time.Month(month), day, h, m, s, n, tz)
+	tz := x._parseTimezone(raw_value[8:10])
+	offset := x._parseTimezone(raw_value[10:12])
+	return time.Date(year, time.Month(month), day, h, m, s, n, tz).In(offset)
 }
 
 func (x *xSQLVAR) parseString(raw_value []byte, charset string) interface{} {
@@ -518,8 +519,6 @@ func (x *xSQLVAR) value(raw_value []byte, timezone string, charset string) (v in
 	case SQL_TYPE_TIMESTAMP:
 		v = x.parseTimestamp(raw_value, timezone)
 	case SQL_TYPE_TIME_TZ:
-		fmt.Println("value()")
-		fmt.Println(raw_value)
 		v = x.parseTimeTz(raw_value)
 	case SQL_TYPE_TIMESTAMP_TZ:
 		v = x.parseTimestampTz(raw_value)
